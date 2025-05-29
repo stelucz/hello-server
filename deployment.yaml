@@ -2,6 +2,46 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: hello-server-deployment
+  labels:
+    app: hello-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-server
+  template:
+    metadata:
+      labels:
+        app: hello-server
+    spec:
+      containers:
+      - name: hello-server-container
+        image: ghcr.io/stelucz/hello-server/hello-server:1.0.0 # IMPORTANT: Ensure this is your correct server image
+        args: ["server"]
+        ports:
+        - containerPort: 8989
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-server-service
+  labels:
+    app: hello-server
+spec:
+  selector:
+    app: hello-server
+  ports:
+    - protocol: TCP
+      port: 8989       # Port the service will listen on internally
+      targetPort: 8989 # Port the container (server) listens on
+      # nodePort: 30000 # Optional: specify a NodePort, otherwise K8s assigns one in range 30000-32767
+  type: NodePort # Changed from ClusterIP to NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: hello-client-deployment
   labels:
     app: hello-client
@@ -15,6 +55,10 @@ spec:
       labels:
         app: hello-client
     spec:
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists" # Or "Equal" if a value is also specified for the taint
+        effect: "NoSchedule"
       containers:
       - name: hello-client-container
         image: ghcr.io/stelucz/hello-server/hello-server:1.0.0 # IMPORTANT: Replace with your actual image name and tag

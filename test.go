@@ -83,30 +83,52 @@ func runClient() {
 	ticker := time.NewTicker(sendPeriod)
 	defer ticker.Stop()
 
+	var messageCount int64 = 0 // Initialize message counter
+
 	for {
 		select {
 		case <-ticker.C:
-			timestamp := time.Now().Format(time.RFC3339Nano)
-			message := fmt.Sprintf("Hello from client at %s\n", timestamp)
-			_, err := conn.Write([]byte(message))
-			if err != nil {
-				log.Printf("Failed to send message: %v", err)
-				// Attempt to reconnect or handle error appropriately
-				// For simplicity, we'll exit here. In a real app, you might retry.
+			messageCount++ // Increment for new conceptual message
+
+			var currentMessageToSend string
+			maxSendAttempts := 3 // Define max attempts for a single message
+
+			for attempt := 1; attempt <= maxSendAttempts; attempt++ {
+				timestamp := time.Now().Format(time.RFC3339Nano)
+				if attempt == 1 {
+					currentMessageToSend = fmt.Sprintf("Hello #%d from client at %s\n", messageCount, timestamp)
+				} else {
+					currentMessageToSend = fmt.Sprintf("Hello #%d (attempt %d) from client at %s\n", messageCount, attempt, timestamp)
+				}
+
+				_, err := conn.Write([]byte(currentMessageToSend))
+				if err == nil {
+					// Message sent successfully
+					log.Printf("Sent to %s: %s", serverAddr, strings.TrimSpace(currentMessageToSend))
+					break // Exit attempt loop, wait for next ticker
+				}
+
+				// If write failed
+				log.Printf("Failed to send message #%d (attempt %d): %v", messageCount, attempt, err)
+
+				if attempt == maxSendAttempts {
+					log.Fatalf("Failed to send message #%d after %d attempts. Exiting.", messageCount, maxSendAttempts)
+				}
+
 				log.Println("Attempting to reconnect...")
-				conn.Close() // Close the old connection
+				conn.Close() // Close the old/failed connection
+
 				newConn, dialErr := net.DialTimeout("tcp", serverAddr, 5*time.Second)
 				if dialErr != nil {
-					log.Fatalf("Failed to reconnect to server %s: %v. Exiting.", serverAddr, dialErr)
+					log.Printf("Failed to reconnect on attempt %d for message #%d: %v.", attempt, messageCount, dialErr)
+					// Pause briefly before next attempt to avoid tight loop on connection errors
+					time.Sleep(time.Second)
+					continue // Continue to next attempt, will try to connect again
 				}
 				conn = newConn // Update connection
-				log.Println("Reconnected to server.")
-				// Send the message again after reconnecting
-				if _, err := conn.Write([]byte(message)); err != nil {
-					log.Fatalf("Failed to send message after reconnect: %v. Exiting.", err)
-				}
+				log.Println("Reconnected to server. Retrying send.")
+				// Loop will continue to the next attempt with the new connection
 			}
-			log.Printf("Sent to %s: %s", serverAddr, strings.TrimSpace(message))
 		}
 	}
 }
