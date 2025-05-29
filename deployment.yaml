@@ -1,0 +1,28 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-client-deployment
+  labels:
+    app: hello-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-client
+  template:
+    metadata:
+      labels:
+        app: hello-client
+    spec:
+      containers:
+      - name: hello-client-container
+        image: ghcr.io/stelucz/hello-server/hello-server:1.0.0 # IMPORTANT: Replace with your actual image name and tag
+        args: ["client"]
+        env:
+          - name: SERVER_ADDR
+            # The client will connect to the server service at its DNS name
+            # within the Kubernetes cluster. The port is the service port.
+            value: "hello-server-service:8989"
+          - name: SEND_PERIOD
+            value: "5s" # Default send period, can be adjusted
