@@ -1,0 +1,29 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Build the Docker image
+      run: |
+        IMAGE_ID=ghcr.io/${{ github.repository_owner }}/hello-server
+        IMAGE_TAG=$(date +%s)
+        docker build . --file Dockerfile --tag $IMAGE_ID:$IMAGE_TAG
+        echo "IMAGE_ID=$IMAGE_ID" >> $GITHUB_ENV
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+    - name: Push the Docker image
+      run: |
+        docker push $IMAGE_ID:$IMAGE_TAG
