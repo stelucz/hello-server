@@ -73,12 +73,18 @@ func runClient() {
     }
     log.Printf("Client configured to send to %s every %v", serverAddr, sendPeriod)
 
-    conn, err := net.DialTimeout("tcp", serverAddr, 5*time.Second)
-    if err != nil {
-        log.Fatalf("Failed to connect to server %s: %v", serverAddr, err)
+    var conn net.Conn
+    var err error
+    for {
+        conn, err = net.DialTimeout("tcp", serverAddr, 5*time.Second)
+        if err == nil {
+            log.Printf("Connected to server: %s", serverAddr)
+            break // Successfully connected
+        }
+        log.Printf("Failed to connect to server %s: %v. Retrying in 5 seconds...", serverAddr, err)
+        time.Sleep(5 * time.Second)
     }
     defer conn.Close()
-    log.Printf("Connected to server: %s", serverAddr)
 
     ticker := time.NewTicker(sendPeriod)
     defer ticker.Stop()
